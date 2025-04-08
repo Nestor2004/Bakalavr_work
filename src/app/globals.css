@@ -3,19 +3,46 @@
 @tailwind utilities;
 
 :root {
+  /* Modern color palette */
+  --primary: #2563eb;
+  --primary-light: #60a5fa;
+  --secondary: #4f46e5;
+  --accent: #f59e0b;
   --background: #ffffff;
-  --foreground: #171717;
+  --surface: #f8fafc;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --error: #ef4444;
+  --success: #22c55e;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
     --foreground: #ededed;
   }
 }
 
 body {
-  color: var(--foreground);
+  color: var(--text-primary);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans);
+}
+
+/* Custom utility classes */
+@layer components {
+  .card {
+    @apply bg-white rounded-lg shadow-md p-6 transition-all duration-200 hover:shadow-lg;
+  }
+  
+  .button-primary {
+    @apply px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-light transition-colors duration-200;
+  }
+  
+  .button-secondary {
+    @apply px-4 py-2 border border-secondary text-secondary rounded-lg hover:bg-secondary hover:text-white transition-colors duration-200;
+  }
+  
+  .input-field {
+    @apply w-full p-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none;
+  }
 }
