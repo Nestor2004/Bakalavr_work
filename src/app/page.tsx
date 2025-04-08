@@ -48,9 +48,10 @@ export default function Page() {
           isCreator: project.isCreator
         }));
         dispatch(setProjects(serializedProjects));
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error loading projects:', error);
-        setError(error.message);
+        const errorMessage = error instanceof Error ? error.message : "";
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -71,8 +72,9 @@ export default function Page() {
       };
       dispatch(addProject(newProject));
       dispatch(selectProject(projectId));
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      setError(errorMessage);
       console.error('Error creating project:', error);
     }
   };
@@ -83,8 +85,9 @@ export default function Page() {
     try {
       await deleteProjectFromFirebase(selectedProjectId);
       dispatch(deleteProject());
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "";
+      setError(errorMessage);
     }
   };
   let content;

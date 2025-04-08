@@ -1,6 +1,8 @@
 import { Project } from '@/models/models';
 import TasksBoard from './TaskBoard';
 import Button from './Button';
+import { updateTaskStatusInFirebase } from '@/services/firebaseService';
+
 interface SelectedProjectProps {
   project: Project;
   onDelete: () => void;
@@ -60,11 +62,16 @@ export default function SelectedProject({ project, onDelete }: SelectedProjectPr
         )}
       </section>
       <h1 className='text-xl font-bold text-stone-600 mb-2'>Tasks Board</h1>
-      <TasksBoard 
-        tasks={project.tasks || []}
-        projectId={project.id} 
-        resources={project.resources || []}
-      />
+      {project.id && (
+        <TasksBoard 
+          tasks={project.tasks || []}
+          projectId={project.id}
+          resources={project.resources || []}
+          onStatusChange={(taskId, status) => {
+            updateTaskStatusInFirebase(project.id!, taskId, status);
+          }}
+        />
+      )}
     </div>
   );
 }

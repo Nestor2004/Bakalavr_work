@@ -23,8 +23,9 @@ export default function ShareAccess({ projectId }: ShareAccessProps) {
       setMessage('Access granted successfully');
       setEmail('');
       setTimeout(() => setIsOpen(false), 2000);
-    } catch (error: any) {
-      setMessage(error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      setMessage(errorMessage);
     } finally {
       setIsLoading(false);
     }

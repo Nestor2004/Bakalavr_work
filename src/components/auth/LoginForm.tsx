@@ -17,8 +17,9 @@ export default function LoginForm() {
     try {
       await loginUser(email, password);
       router.push('/');
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      setError(errorMessage);
     }
   };
  

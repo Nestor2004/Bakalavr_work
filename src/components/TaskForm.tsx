@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Calendar, Users } from "lucide-react";
+import { X } from "lucide-react";
 import { Task, Resource } from "@/models/models";
 
 interface TaskFormProps {
@@ -35,8 +35,9 @@ export default function TaskForm({ handleAddTask, resources, setIsOpen }: TaskFo
         status: "To Do"
       });
       setIsOpen(false);
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      setError(errorMessage);
     }
   };
 

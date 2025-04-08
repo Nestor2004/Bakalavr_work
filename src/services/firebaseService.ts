@@ -2,9 +2,9 @@ import { auth, db } from '@/services/firebase';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut,
-  User,
+  signOut
 } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 import { 
   collection, 
   addDoc, 
@@ -16,9 +16,11 @@ import {
   arrayUnion,
   getDoc,
   deleteDoc,
-  setDoc
+  setDoc,
+  FirestoreError
 } from 'firebase/firestore';
 import { Project, Task } from '@/models/models';
+
 export const registerUser = async (email: string, password: string, username: string) => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -31,26 +33,37 @@ export const registerUser = async (email: string, password: string, username: st
     });
     
     return userCredential.user;
-  } catch (error: any) {
-    throw new Error(error.message);
+  } catch (error) {
+    if (error instanceof FirebaseError) {
+      throw new Error(`Registration error: ${error.message}`);
+    }
+    throw new Error('An unknown error occurred during registration');
   }
 };
+
 export const loginUser = async (email: string, password: string) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     return userCredential.user;
-  } catch (error: any) {
-    throw new Error(error.message);
+  } catch (error) {
+    if (error instanceof FirebaseError) {
+      throw new Error(`Login error: ${error.message}`);
+    }
+    throw new Error('An unknown error occurred during login');
   }
 };
 
 export const logoutUser = async () => {
   try {
     await signOut(auth);
-  } catch (error: any) {
-    throw new Error(error.message);
+  } catch (error) {
+    if (error instanceof FirebaseError) {
+      throw new Error(`Logout error: ${error.message}`);
+    }
+    throw new Error('An unknown error occurred during logout');
   }
 };
+
 export const createProject = async (projectData: Omit<Project, 'id'>) => {
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
@@ -69,8 +82,10 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
 
     const projectRef = await addDoc(collection(db, 'projects'), projectToSave);
     return projectRef.id;
-  } catch (error) {
-    console.error('Error creating project:', error);
+  } catch (error: unknown) {
+    if (error instanceof FirestoreError) {
+      throw new Error(error.message);
+    }
     throw new Error('Failed to create project');
   }
 };
@@ -143,11 +158,14 @@ export const fetchProjects = async (): Promise<Project[]> => {
     ];
 
     return projects;
-  } catch (error) {
-    console.error('Error fetching projects:', error);
+  } catch (error: unknown) {
+    if (error instanceof FirestoreError) {
+      throw new Error(error.message);
+    }
     throw new Error('Failed to fetch projects');
   }
 };
+
 export const deleteProject = async (projectId: string) => {
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
@@ -159,11 +177,13 @@ export const deleteProject = async (projectId: string) => {
       throw new Error('Not authorized to delete this project');
     }
     await deleteDoc(projectRef);
-  } catch (error: any) {
-    throw new Error(error.message);
+  } catch (error: unknown) {
+    if (error instanceof FirestoreError) {
+      throw new Error(error.message);
+    }
+    throw new Error('Failed to delete project');
   }
 };
-
 
 export const addTaskToFirebase = async (projectId: string, taskData: Omit<Task, 'id'>) => {
   const user = auth.currentUser;
@@ -183,8 +203,11 @@ export const addTaskToFirebase = async (projectId: string, taskData: Omit<Task, 
       createdBy: user.uid
     });
     return taskRef.id;
-  } catch (error: any) {
-    throw new Error(error.message);
+  } catch (error: unknown) {
+    if (error instanceof FirestoreError) {
+      throw new Error(error.message);
+    }
+    throw new Error('Failed to add task');
   }
 };
 
@@ -205,11 +228,13 @@ export const updateTaskStatusInFirebase = async (
       throw new Error('Not authorized to update tasks in this project');
     }
     await updateDoc(taskRef, { status: newStatus });
-  } catch (error: any) {
-    throw new Error(error.message);
+  } catch (error: unknown) {
+    if (error instanceof FirestoreError) {
+      throw new Error(error.message);
+    }
+    throw new Error('Failed to update task status');
   }
 };
-
 
 export const shareProject = async (projectId: string, userEmail: string) => {
   const user = auth.currentUser;
@@ -229,11 +254,13 @@ export const shareProject = async (projectId: string, userEmail: string) => {
       sharedWith: arrayUnion(userEmail)
     });
     return true;
-  } catch (error: any) {
-    throw new Error(error.message);
+  } catch (error: unknown) {
+    if (error instanceof FirestoreError) {
+      throw new Error(error.message);
+    }
+    throw new Error('Failed to share project');
   }
 };
-
 
 export const fetchProjectTasks = async (projectId: string) => {
   const user = auth.currentUser;
@@ -251,37 +278,35 @@ export const fetchProjectTasks = async (projectId: string) => {
     return tasksSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    })) as Task[];
-  } catch (error: any) {
-    throw new Error(error.message);
+    }));
+  } catch (error: unknown) {
+    if (error instanceof FirestoreError) {
+      throw new Error(error.message);
+    }
+    throw new Error('Failed to fetch project tasks');
   }
 };
-
 
 export const deleteTaskFromFirebase = async (projectId: string, taskId: string) => {
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
-
   try {
     const projectRef = doc(db, 'projects', projectId);
     const projectDoc = await getDoc(projectRef);
-    
-    if (!projectDoc.exists()) {
-      throw new Error('Project not found');
-    }
+    if (!projectDoc.exists()) throw new Error('Project not found');
     const project = projectDoc.data();
     if (project.creatorId !== user.uid && !project.sharedWith.includes(user.email)) {
       throw new Error('Not authorized to delete tasks in this project');
     }
     const taskRef = doc(projectRef, 'tasks', taskId);
     await deleteDoc(taskRef);
-    return true;
-  } catch (error: any) {
-    console.error('Error deleting task:', error);
+  } catch (error: unknown) {
+    if (error instanceof FirestoreError) {
+      throw new Error(error.message);
+    }
     throw new Error('Failed to delete task');
   }
 };
-
 
 export const updateTaskInFirebase = async (
   projectId: string, 
@@ -290,19 +315,20 @@ export const updateTaskInFirebase = async (
 ) => {
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
-
   try {
     const projectRef = doc(db, 'projects', projectId);
+    const projectDoc = await getDoc(projectRef);
+    if (!projectDoc.exists()) throw new Error('Project not found');
+    const project = projectDoc.data();
+    if (project.creatorId !== user.uid && !project.sharedWith.includes(user.email)) {
+      throw new Error('Not authorized to update tasks in this project');
+    }
     const taskRef = doc(projectRef, 'tasks', taskId);
-    
-    await updateDoc(taskRef, {
-      ...taskData,
-      updatedAt: new Date().toISOString()
-    });
-
-    return true;
-  } catch (error) {
-    console.error('Error updating task:', error);
+    await updateDoc(taskRef, taskData);
+  } catch (error: unknown) {
+    if (error instanceof FirestoreError) {
+      throw new Error(error.message);
+    }
     throw new Error('Failed to update task');
   }
 };
@@ -310,43 +336,34 @@ export const updateTaskInFirebase = async (
 export const fetchProjectById = async (projectId: string): Promise<Project> => {
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
-
   try {
     const projectRef = doc(db, 'projects', projectId);
     const projectDoc = await getDoc(projectRef);
-    
     if (!projectDoc.exists()) throw new Error('Project not found');
-    
     const data = projectDoc.data();
-    if (data.creatorId !== user.uid && !data.sharedWith.includes(user.email)) {
-      throw new Error('Not authorized to view this project');
-    }
-
-    // Fetch tasks from subcollection
-    const tasksCollection = collection(projectRef, 'tasks');
-    const tasksSnapshot = await getDocs(tasksCollection);
-    const tasks = tasksSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Task[];
-
     return {
       id: projectDoc.id,
       title: data.title,
       description: data.description,
-      dueDate: data.dueDate?.toDate?.() ? data.dueDate.toDate().toISOString() : data.dueDate,
+      dueDate: data.dueDate?.toDate?.() 
+        ? data.dueDate.toDate().toISOString() 
+        : data.dueDate,
       budget: data.budget,
       currency: data.currency,
       resources: data.resources || [],
-      tasks: tasks, // Use tasks from subcollection
+      tasks: data.tasks || [],
       creatorId: data.creatorId,
       creatorEmail: data.creatorEmail,
-      sharedWith: data.sharedWith,
-      createdAt: data.createdAt?.toDate?.() ? data.createdAt.toDate().toISOString() : data.createdAt,
+      sharedWith: data.sharedWith || [],
+      createdAt: data.createdAt?.toDate?.() 
+        ? data.createdAt.toDate().toISOString() 
+        : data.createdAt,
       isCreator: data.creatorId === user.uid
-    } as Project;
-  } catch (error) {
-    console.error('Error fetching project:', error);
+    };
+  } catch (error: unknown) {
+    if (error instanceof FirestoreError) {
+      throw new Error(error.message);
+    }
     throw new Error('Failed to fetch project');
   }
 };

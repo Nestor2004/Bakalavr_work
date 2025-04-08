@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Project, Resource, Task } from '@/models/models';
+import { Project, Resource } from '@/models/models';
 import Input from './Input';
 import Modal from './Modal';
 import Resources from './Resourches';
