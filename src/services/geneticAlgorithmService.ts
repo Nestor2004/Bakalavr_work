@@ -53,7 +53,7 @@ export class GeneticAlgorithmService {
       while (newPopulation.length < this.populationSize) {
         const parent1 = this.selectParent(population, fitnessResults);
         const parent2 = this.selectParent(population, fitnessResults);
-        const [child1, child2] = this.crossover(parent1, parent2, this.tasks, this.resources);
+        const [child1, child2] = this.crossover(parent1, parent2);
         
         newPopulation.push(this.mutate(child1));
         if (newPopulation.length < this.populationSize) {
@@ -163,7 +163,6 @@ export class GeneticAlgorithmService {
     const minWorkload = Math.min(...Object.values(resourceWorkload));
     const workloadBalance = minWorkload / (maxWorkload || 1);
 
-    // Combine metrics with weights
     const fitness = (
       resourceUtilization * 0.4 +
       deadlineMeetingRate * 0.4 +
@@ -181,7 +180,7 @@ export class GeneticAlgorithmService {
     };
   }
 
-  private crossover(parent1: TaskSchedule[], parent2: TaskSchedule[], tasks: Task[], resources: Resource[]): [TaskSchedule[], TaskSchedule[]] {
+  private crossover(parent1: TaskSchedule[], parent2: TaskSchedule[]): [TaskSchedule[], TaskSchedule[]] {
     const crossoverPoint = Math.floor(Math.random() * parent1.length);
     
     const child1 = [...parent1.slice(0, crossoverPoint), ...parent2.slice(crossoverPoint)];
@@ -311,7 +310,7 @@ const calculateDeadlineMeetingRate = (schedule: TaskSchedule[], tasks: Task[]): 
 };
 
 // Helper function to calculate workload balance
-const calculateWorkloadBalance = (schedule: TaskSchedule[], resources: Resource[]): number => {
+const calculateWorkloadBalance = (schedule: TaskSchedule[]): number => {
   const resourceWorkloads = new Map<string, number>();
   
   schedule.forEach(task => {
@@ -354,10 +353,11 @@ const generateRandomSchedule = (tasks: Task[], resources: Resource[]): Solution 
 };
 
 // Helper function to calculate metrics for a schedule
-const calculateMetrics = (schedule: any[], tasks: Task[], resources: Resource[]) => {
+const calculateMetrics = (schedule: TaskSchedule[], tasks: Task[], resources: Resource[]): Solution['metrics'] => {
   const resourceUtilization = calculateResourceUtilization(schedule, resources);
   const deadlineMeetingRate = calculateDeadlineMeetingRate(schedule, tasks);
-  const workloadBalance = calculateWorkloadBalance(schedule, resources);
+  const workloadBalance = calculateWorkloadBalance(schedule
+  );
   
   return {
     resourceUtilization,

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import Button from '../../Button';
 import { Project } from '@/models/models';
 import { PlusCircle, Folder, LogOut, User, ChevronUp, ChevronDown, Settings } from 'lucide-react';
 import { useRouter } from "next/navigation";

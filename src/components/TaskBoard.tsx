@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import React, { useState, useEffect } from 'react';
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { Task, Resource } from "@/models/models";
 import TaskForm from "@/components/TaskForm";
 import TaskInformation from "./TaskInformation";
-import { Clock, DollarSign, Hash } from "lucide-react";
 import { 
   updateTaskStatusInFirebase, 
   addTaskToFirebase,
@@ -13,21 +12,21 @@ import {
 } from "@/services/firebaseService";
 import { useRouter } from 'next/navigation';
 
-const statuses = ["To Do", "In Progress", "Ready to test", "Done"];
+type TaskStatus = 'todo' | 'inProgress' | 'readyToTest' | 'done';
 
-export default function TasksBoard({
-  projectId,
-  resources,
-}: {
+interface TaskBoardProps {
   projectId: string;
+  tasks: Task[];
   resources: Resource[];
-}) {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  onStatusChange: (taskId: string, status: TaskStatus) => void;
+}
+
+export default function TaskBoard({ projectId, tasks: initialTasks, resources, onStatusChange }: TaskBoardProps) {
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -35,9 +34,10 @@ export default function TasksBoard({
       try {
         setLoading(true);
         const projectTasks = await fetchProjectTasks(projectId);
-        setTasks(projectTasks);
-      } catch (error: any) {
-        setError(error.message);
+        setTasks(projectTasks as Task[]);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -48,26 +48,28 @@ export default function TasksBoard({
     }
   }, [projectId]);
 
-  const handleDragEnd = async (result: any) => {
-    if (!result.destination || !projectId) return;
-
-    const { source, destination, draggableId } = result;
-    if (source.droppableId === destination.droppableId) return;
-
-    try {
-      await updateTaskStatusInFirebase(projectId, draggableId, destination.droppableId);
-      
-      // Оновлюємо локальний стан
-      setTasks(prevTasks => 
-        prevTasks.map(task => 
-          task.id === draggableId 
-            ? { ...task, status: destination.droppableId }
-            : task
-        )
-      );
-    } catch (error: any) {
-      setError(error.message);
+  useEffect(() => {
+    if (Array.isArray(initialTasks)) {
+      setTasks(initialTasks);
     }
+  }, [initialTasks]);
+
+  const onDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+
+    const {  destination } = result;
+    const newStatus = destination.droppableId as TaskStatus;
+
+    const updatedTasks = tasks.map(task => {
+      if (task.id === result.draggableId) {
+        return { ...task, status: newStatus };
+      }
+      return task;
+    });
+
+    setTasks(updatedTasks);
+    await updateTaskStatusInFirebase(projectId, result.draggableId, newStatus);
+    onStatusChange(result.draggableId, newStatus);
   };
 
   const handleAddTask = async (taskData: Omit<Task, 'id'>) => {
@@ -77,8 +79,9 @@ export default function TasksBoard({
       const taskId = await addTaskToFirebase(projectId, taskData);
       setTasks(prevTasks => [...prevTasks, { ...taskData, id: taskId }]);
       setIsModalOpen(false);
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      setError(errorMessage);
     }
   };
 
@@ -86,8 +89,9 @@ export default function TasksBoard({
     try {
       await deleteTaskFromFirebase(projectId, taskId);
       setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      setError(errorMessage);
     }
   };
 
@@ -99,9 +103,19 @@ export default function TasksBoard({
           task.id === taskId ? { ...task, ...taskData } : task
         )
       );
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      setError(errorMessage);
     }
+  };
+
+  const getTasksByStatus = (status: TaskStatus) => {
+    return tasks.filter(task => task.status === status);
+  };
+
+  const getResourceName = (resourceId: string) => {
+    const resource = resources.find(r => r.id === resourceId);
+    return resource ? resource.name : 'Unassigned';
   };
 
   if (loading) {
@@ -139,65 +153,49 @@ export default function TasksBoard({
         </div>
       )}
 
-      <DragDropContext onDragEnd={handleDragEnd}>
+      <DragDropContext onDragEnd={onDragEnd}>
         <div className="grid grid-cols-4 gap-6 mt-4">
-          {statuses.map((status) => (
-            <Droppable key={status} droppableId={status}>
-              {(provided) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className="bg-surface rounded-xl p-4 min-h-[500px]"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold text-text-primary">{status}</h2>
-                    <span className="px-2 py-1 bg-primary/10 text-primary text-sm rounded-full">
-                      {tasks.filter(t => t.status === status).length}
-                    </span>
-                  </div>
-
-                  {tasks
-                    .filter((task) => task.status === status)
-                    .map((task, index) => (
+          {(['todo', 'inProgress', 'readyToTest', 'done'] as const).map((status) => (
+            <div key={status} className="flex-1">
+              <h3 className="text-lg font-semibold mb-2 capitalize">{status}</h3>
+              <Droppable droppableId={status}>
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="bg-gray-100 p-4 rounded-lg min-h-[200px]"
+                  >
+                    {getTasksByStatus(status).map((task, index) => (
                       <Draggable key={task.id} draggableId={task.id} index={index}>
                         {(provided) => (
                           <div
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
-                            className="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 mb-2 cursor-pointer"
-                            onClick={() => setSelectedTask(task)}
+                            className="bg-white p-3 mb-2 rounded shadow cursor-move"
+                            onClick={() => {
+                              setSelectedTask(task);
+                              setIsModalOpen(true);
+                            }}
                           >
-                            <h3 className="font-semibold mb-2 text-text-primary">
-                              {task.text}
-                            </h3>
-                            <div className="flex justify-between text-sm text-text-secondary">
-                              <div className="flex items-center gap-2">
-                                <Clock size={14} />
-                                <span>
-                                  {new Date(task.deadline).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Hash size={14} />
-                                <span>{task.storyPoints} points</span>
-                              </div>
-                            </div>
-                            {resources.find(r => r.id === task.assignedTo) && (
-                              <div className="mt-2 flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-primary-light flex items-center justify-center text-white text-sm">
-                                  {resources.find(r => r.id === task.assignedTo)?.name[0]}
-                                </div>
-                              </div>
+                            <h4 className="font-medium">{task.text}</h4>
+                            <p className="text-sm text-gray-600">
+                              Assigned to: {getResourceName(task.assignedTo)}
+                            </p>
+                            {task.storyPoints && (
+                              <p className="text-sm text-gray-600">
+                                Story Points: {task.storyPoints}
+                              </p>
                             )}
                           </div>
                         )}
                       </Draggable>
                     ))}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </div>
           ))}
         </div>
       </DragDropContext>
